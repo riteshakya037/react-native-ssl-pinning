@@ -298,7 +298,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     manager.securityPolicy = policy;
     
     // Skip hostname validation by evaluating server trust with domain=nil while still enforcing pinning
-    manager.sessionDidReceiveAuthenticationChallenge = ^NSURLSessionAuthChallengeDisposition(NSURLSession *session, NSURLAuthenticationChallenge *challenge, NSURLCredential *__autoreleasing *credential) {
+    [manager setSessionDidReceiveChallengeBlock:^NSURLSessionAuthChallengeDisposition(NSURLSession *session, NSURLAuthenticationChallenge *challenge, NSURLCredential *__autoreleasing *credential) {
         if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
             SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
             NSString *domain = nil; // Passing nil to avoid hostname validation
@@ -312,24 +312,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
         }
         NSLog(@"[RNSslPinning] [session] performDefaultHandling");
         return NSURLSessionAuthChallengePerformDefaultHandling;
-    };
-
-    // Ensure task-level challenges also route through our evaluation (often preferred by NSURLSession)
-    manager.taskDidReceiveAuthenticationChallenge = ^NSURLSessionAuthChallengeDisposition(NSURLSession * _Nonnull session, NSURLSessionTask * _Nonnull task, NSURLAuthenticationChallenge * _Nonnull challenge, NSURLCredential *__autoreleasing  _Nullable * _Nullable credential) {
-        if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
-            SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
-            NSString *domain = nil;
-            BOOL trusted = [policy evaluateServerTrust:serverTrust forDomain:domain];
-            NSLog(@"[RNSslPinning] [task] evaluateServerTrust(forDomain:nil) => %@", trusted ? @"YES" : @"NO");
-            if (trusted) {
-                *credential = [NSURLCredential credentialForTrust:serverTrust];
-                return NSURLSessionAuthChallengeUseCredential;
-            }
-            return NSURLSessionAuthChallengeCancelAuthenticationChallenge;
-        }
-        NSLog(@"[RNSslPinning] [task] performDefaultHandling");
-        return NSURLSessionAuthChallengePerformDefaultHandling;
-    };
+    }];
     
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
     
