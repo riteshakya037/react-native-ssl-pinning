@@ -285,15 +285,6 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
           disableAllSecurity ? @"YES" : @"NO",
           skipHostnameVerification ? @"YES" : @"NO");
     
-    // + COMMIT: Log individual certificate details from bundle
-    for (NSData *certData in certificates) {
-        SecCertificateRef cert = SecCertificateCreateWithData(NULL, (__bridge CFDataRef)certData);
-        if (cert) {
-            [self logCertificateDetails:cert withTitle:@"Pinned Certificate"];
-            CFRelease(cert);
-        }
-    }
-    
     // set policy (ssl pinning)
     if(disableAllSecurity){
         policy = [AFSecurityPolicy policyWithPinningMode:AFSSLPinningModeNone];
