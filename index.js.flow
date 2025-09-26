@@ -16,7 +16,9 @@ export type Options = {
         certs: Array<string>
     },
     timeoutInterval?: number,
-    disableAllSecurity?: boolean
+    disableAllSecurity?: boolean,
+    caseSensitiveHeaders?: boolean,
+    skipHostnameVerification?: boolean
 }
 
 export type Response = {
