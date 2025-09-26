@@ -260,6 +260,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     AFSecurityPolicy *policy;
     BOOL pkPinning = [[obj objectForKey:@"pkPinning"] boolValue];
     BOOL disableAllSecurity = [[obj objectForKey:@"disableAllSecurity"] boolValue];
+    BOOL skipHostnameVerification = [[obj objectForKey:@"skipHostnameVerification"] boolValue];
     
     NSSet *certificates = [AFSecurityPolicy certificatesInBundle:[NSBundle mainBundle]];
     
@@ -269,10 +270,11 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     for (NSString *path in cerPaths) {
         NSLog(@"[RNSslPinning] .cer in bundle: %@", [path lastPathComponent]);
     }
-    NSLog(@"[RNSslPinning] certificatesInBundle count=%lu, pkPinning=%@, disableAllSecurity=%@",
+    NSLog(@"[RNSslPinning] certificatesInBundle count=%lu, pkPinning=%@, disableAllSecurity=%@, skipHostnameVerification=%@",
           (unsigned long)[certificates count],
           pkPinning ? @"YES" : @"NO",
-          disableAllSecurity ? @"YES" : @"NO");
+          disableAllSecurity ? @"YES" : @"NO",
+          skipHostnameVerification ? @"YES" : @"NO");
     
     // set policy (ssl pinning)
     if(disableAllSecurity){
@@ -290,29 +292,12 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     }
     
     AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
-    policy.validatesDomainName = false;
+    policy.validatesDomainName = !skipHostnameVerification;
 
     NSLog(@"[RNSslPinning] Final policy flags -> validatesDomainName=%@, allowInvalidCertificates=%@",
           policy.validatesDomainName ? @"YES" : @"NO",
           policy.allowInvalidCertificates ? @"YES" : @"NO");
     manager.securityPolicy = policy;
-    
-    // Skip hostname validation by evaluating server trust with domain=nil while still enforcing pinning
-    [manager setSessionDidReceiveChallengeBlock:^NSURLSessionAuthChallengeDisposition(NSURLSession *session, NSURLAuthenticationChallenge *challenge, NSURLCredential *__autoreleasing *credential) {
-        if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
-            SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
-            NSString *domain = nil; // Passing nil to avoid hostname validation
-            BOOL trusted = [policy evaluateServerTrust:serverTrust forDomain:domain];
-            NSLog(@"[RNSslPinning] evaluateServerTrust(forDomain:nil) => %@", trusted ? @"YES" : @"NO");
-            if (trusted) {
-                *credential = [NSURLCredential credentialForTrust:serverTrust];
-                return NSURLSessionAuthChallengeUseCredential;
-            }
-            return NSURLSessionAuthChallengeCancelAuthenticationChallenge;
-        }
-        NSLog(@"[RNSslPinning] [session] performDefaultHandling");
-        return NSURLSessionAuthChallengePerformDefaultHandling;
-    }];
     
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
     

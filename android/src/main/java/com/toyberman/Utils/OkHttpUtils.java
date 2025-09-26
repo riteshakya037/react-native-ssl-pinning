@@ -70,7 +70,9 @@ public class OkHttpUtils {
 
         OkHttpClient client = null;
         CertificatePinner certificatePinner = null;
-        if (!clientsByDomain.containsKey(domainName)) {
+        boolean skipHostnameVerification = options.hasKey("skipHostnameVerification") && options.getBoolean("skipHostnameVerification");
+        String cacheKey = domainName + "|skipHost=" + (skipHostnameVerification ? "1" : "0");
+        if (!clientsByDomain.containsKey(cacheKey)) {
             // add logging interceptor
             HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
             logging.setLevel(HttpLoggingInterceptor.Level.BODY);
@@ -95,21 +97,22 @@ public class OkHttpUtils {
             }
             addCustomDebugInterceptor(clientBuilder);
 
-            HostnameVerifier hostnameVerifier = new HostnameVerifier() {
-                @Override
-                public boolean verify(String hostname, SSLSession session) {
-                    return true;
-                }
-            };
+            if (skipHostnameVerification) {
+                HostnameVerifier hostnameVerifier = new HostnameVerifier() {
+                    @Override
+                    public boolean verify(String hostname, SSLSession session) {
+                        return true;
+                    }
+                };
+                clientBuilder.hostnameVerifier(hostnameVerifier);
+            }
 
-            client = clientBuilder
-                    .hostnameVerifier(hostnameVerifier)
-                    .build();
+            client = clientBuilder.build();
 
 
-            clientsByDomain.put(domainName, client);
+            clientsByDomain.put(cacheKey, client);
         } else {
-            client = clientsByDomain.get(domainName);
+            client = clientsByDomain.get(cacheKey);
         }
 
 
