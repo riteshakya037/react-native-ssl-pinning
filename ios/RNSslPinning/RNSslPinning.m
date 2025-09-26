@@ -266,7 +266,6 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     // set policy (ssl pinning)
     if(disableAllSecurity){
         policy = [AFSecurityPolicy policyWithPinningMode:AFSSLPinningModeNone];
-        policy.validatesDomainName = false;
         policy.allowInvalidCertificates = true;
     }
     else if (pkPinning){
@@ -277,6 +276,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     }
     
     AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
+    policy.validatesDomainName = false;
     manager.securityPolicy = policy;
     
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
