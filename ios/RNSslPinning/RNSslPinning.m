@@ -3,10 +3,6 @@
 
 #import "RNSslPinning.h"
 #import "AFNetworking.h"
-// + COMMIT: Add Security framework import for detailed certificate logging
-#import <Security/Security.h>
-// + COMMIT: Add CommonCrypto for certificate hash calculation
-#import <CommonCrypto/CommonDigest.h>
 
 static void (^_requestObserver)(NSURLRequest *) = nil;
 static void (^_responseObserver)(NSURLRequest *, NSHTTPURLResponse *, NSData *, NSTimeInterval) = nil;
@@ -62,6 +58,8 @@ RCT_EXPORT_METHOD(getCookies: (NSURL *)url resolver:(RCTPromiseResolveBlock)reso
     }
 }
 
+
+
 RCT_EXPORT_METHOD(removeCookieByName: (NSString *)cookieName
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
@@ -80,179 +78,6 @@ RCT_EXPORT_METHOD(removeCookieByName: (NSString *)cookieName
     
 }
 
-// + COMMIT: Add new method for detailed certificate validation logging
-- (void)logCertificateDetails:(SecCertificateRef)certificate withTitle:(NSString *)title {
-    if (!certificate) {
-        NSLog(@"[RNSslPinning] %@ is NULL", title);
-        return;
-    }
-    
-    // Get certificate subject
-    CFStringRef subject = SecCertificateCopySubjectSummary(certificate);
-    NSLog(@"[RNSslPinning] %@ Subject: %@", title, subject ?: @"Unknown");
-    if (subject) CFRelease(subject);
-    
-    // Calculate certificate SHA256 hash for comparison
-    CFDataRef certData = SecCertificateCopyData(certificate);
-    if (certData) {
-        NSData *data = (__bridge NSData *)certData;
-        unsigned char hash[CC_SHA256_DIGEST_LENGTH];
-        CC_SHA256(data.bytes, (CC_LONG)data.length, hash);
-        
-        NSMutableString *hashString = [NSMutableString string];
-        for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
-            [hashString appendFormat:@"%02x", hash[i]];
-        }
-        
-        NSLog(@"[RNSslPinning] %@ SHA256: %@", title, hashString);
-        CFRelease(certData);
-    }
-}
-
-// + COMMIT: Add method to log server certificate chain details
-- (void)logServerTrustDetails:(SecTrustRef)serverTrust {
-    if (!serverTrust) {
-        NSLog(@"[RNSslPinning] Server trust is NULL");
-        return;
-    }
-    
-    CFIndex certCount = SecTrustGetCertificateCount(serverTrust);
-    NSLog(@"[RNSslPinning] Server certificate chain contains %ld certificate(s)", certCount);
-    
-    for (CFIndex i = 0; i < certCount; i++) {
-        SecCertificateRef cert = SecTrustGetCertificateAtIndex(serverTrust, i);
-        [self logCertificateDetails:cert withTitle:[NSString stringWithFormat:@"Server Cert[%ld]", i]];
-    }
-}
-
-// + COMMIT: Add method to log trust evaluation result details
-- (void)logTrustEvaluationResult:(SecTrustResultType)result status:(OSStatus)status {
-    NSLog(@"[RNSslPinning] Trust evaluation OSStatus: %d", (int)status);
-    
-    NSString *resultString;
-    switch (result) {
-        case kSecTrustResultInvalid:
-            resultString = @"Invalid";
-            break;
-        case kSecTrustResultProceed:
-            resultString = @"Proceed (user approved)";
-            break;
-        case kSecTrustResultDeny:
-            resultString = @"Deny (user rejected)";
-            break;
-        case kSecTrustResultUnspecified:
-            resultString = @"Unspecified (system trusts)";
-            break;
-        case kSecTrustResultRecoverableTrustFailure:
-            resultString = @"Recoverable Trust Failure";
-            break;
-        case kSecTrustResultFatalTrustFailure:
-            resultString = @"Fatal Trust Failure";
-            break;
-        case kSecTrustResultOtherError:
-            resultString = @"Other Error";
-            break;
-        default:
-            resultString = [NSString stringWithFormat:@"Unknown (%u)", result];
-            break;
-    }
-    
-    NSLog(@"[RNSslPinning] Trust result: %@", resultString);
-    
-    if (result == kSecTrustResultRecoverableTrustFailure || result == kSecTrustResultFatalTrustFailure) {
-        NSLog(@"[RNSslPinning] ❌ Certificate validation FAILED");
-    } else if (result == kSecTrustResultUnspecified || result == kSecTrustResultProceed) {
-        NSLog(@"[RNSslPinning] ✅ Certificate validation PASSED");
-    }
-}
-
-// + COMMIT: Add new method to test certificate loading and validation
-RCT_EXPORT_METHOD(debugCertificateInfo:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject) {
-    
-    NSMutableArray *certInfo = [[NSMutableArray alloc] init];
-    
-    // Check for .cer files in bundle
-    NSArray<NSString *> *cerPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"cer" inDirectory:nil];
-    NSArray<NSString *> *crtPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"crt" inDirectory:nil];
-    
-    NSLog(@"[RNSslPinning] Found %lu .cer files and %lu .crt files in bundle", 
-          (unsigned long)cerPaths.count, (unsigned long)crtPaths.count);
-    
-    // Process .cer files
-    for (NSString *path in cerPaths) {
-        NSString *filename = [[path lastPathComponent] stringByDeletingPathExtension];
-        NSData *certData = [NSData dataWithContentsOfFile:path];
-        
-        if (certData) {
-            SecCertificateRef cert = SecCertificateCreateWithData(NULL, (__bridge CFDataRef)certData);
-            if (cert) {
-                CFStringRef subject = SecCertificateCopySubjectSummary(cert);
-                
-                [certInfo addObject:@{
-                    @"filename": filename,
-                    @"type": @"cer",
-                    @"size": @(certData.length),
-                    @"subject": (__bridge NSString *)subject ?: @"Unknown",
-                    @"valid": @YES
-                }];
-                
-                [self logCertificateDetails:cert withTitle:[NSString stringWithFormat:@"Bundle Cert: %@", filename]];
-                
-                if (subject) CFRelease(subject);
-                CFRelease(cert);
-            } else {
-                [certInfo addObject:@{
-                    @"filename": filename,
-                    @"type": @"cer",
-                    @"size": @(certData.length),
-                    @"error": @"Invalid certificate format",
-                    @"valid": @NO
-                }];
-            }
-        }
-    }
-    
-    // Process .crt files
-    for (NSString *path in crtPaths) {
-        NSString *filename = [[path lastPathComponent] stringByDeletingPathExtension];
-        NSData *certData = [NSData dataWithContentsOfFile:path];
-        
-        if (certData) {
-            SecCertificateRef cert = SecCertificateCreateWithData(NULL, (__bridge CFDataRef)certData);
-            if (cert) {
-                CFStringRef subject = SecCertificateCopySubjectSummary(cert);
-                
-                [certInfo addObject:@{
-                    @"filename": filename,
-                    @"type": @"crt",
-                    @"size": @(certData.length),
-                    @"subject": (__bridge NSString *)subject ?: @"Unknown",
-                    @"valid": @YES
-                }];
-                
-                [self logCertificateDetails:cert withTitle:[NSString stringWithFormat:@"Bundle Cert: %@", filename]];
-                
-                if (subject) CFRelease(subject);
-                CFRelease(cert);
-            } else {
-                [certInfo addObject:@{
-                    @"filename": filename,
-                    @"type": @"crt", 
-                    @"size": @(certData.length),
-                    @"error": @"Invalid certificate format",
-                    @"valid": @NO
-                }];
-            }
-        }
-    }
-    
-    resolve(@{
-        @"certificates": certInfo,
-        @"cerCount": @(cerPaths.count),
-        @"crtCount": @(crtPaths.count)
-    });
-}
 
 -(void)performRequest:(AFURLSessionManager*)manager  obj:(NSDictionary *)obj  request:(NSMutableURLRequest*) request callback:(RCTResponseSenderBlock) callback  {
 #if DEBUG
@@ -480,11 +305,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     
     // Debug logging: enumerate bundled .cer files and policy inputs
     NSArray<NSString *> *cerPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"cer" inDirectory:nil];
-    // + COMMIT: Also check for .crt files
-    NSArray<NSString *> *crtPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"crt" inDirectory:nil];
-    NSLog(@"[RNSslPinning] Found %lu .cer file(s) and %lu .crt file(s) in main bundle", 
-          (unsigned long)cerPaths.count, (unsigned long)crtPaths.count);
-    
+    NSLog(@"[RNSslPinning] Found %lu .cer file(s) in main bundle", (unsigned long)cerPaths.count);
     for (NSString *path in cerPaths) {
         NSLog(@"[RNSslPinning] .cer in bundle: %@", [path lastPathComponent]);
     }
@@ -529,45 +350,6 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     NSLog(@"[RNSslPinning] Final policy flags -> validatesDomainName=%@, allowInvalidCertificates=%@",
           policy.validatesDomainName ? @"YES" : @"NO",
           policy.allowInvalidCertificates ? @"YES" : @"NO");
-    
-    // + COMMIT: Add custom security policy evaluation with detailed logging
-    if (!disableAllSecurity) {
-        AFSecurityPolicy *originalPolicy = policy;
-        policy = [AFSecurityPolicy policyWithPinningMode:originalPolicy.SSLPinningMode withPinnedCertificates:originalPolicy.pinnedCertificates];
-        policy.allowInvalidCertificates = originalPolicy.allowInvalidCertificates;
-        policy.validatesDomainName = originalPolicy.validatesDomainName;
-        
-        // Override the evaluation method to add logging
-        policy.serverTrustEvaluator = ^BOOL(SecTrustRef serverTrust, NSString *domain) {
-            NSLog(@"[RNSslPinning] 🔐 Evaluating server trust for domain: %@", domain);
-            
-            // Log server certificate details
-            [self logServerTrustDetails:serverTrust];
-            
-            // Perform the original evaluation
-            BOOL result = [originalPolicy evaluateServerTrust:serverTrust forDomain:domain];
-            
-            NSLog(@"[RNSslPinning] Server trust evaluation result: %@", result ? @"✅ PASSED" : @"❌ FAILED");
-            
-            if (!result) {
-                // Get additional failure details
-                SecTrustResultType trustResult;
-                OSStatus status = SecTrustEvaluate(serverTrust, &trustResult);
-                [self logTrustEvaluationResult:trustResult status:status];
-                
-                // Log trust properties for debugging
-                CFArrayRef properties = SecTrustCopyProperties(serverTrust);
-                if (properties) {
-                    NSArray *propsArray = (__bridge NSArray *)properties;
-                    NSLog(@"[RNSslPinning] Trust failure properties: %@", propsArray);
-                    CFRelease(properties);
-                }
-            }
-            
-            return result;
-        };
-    }
-    
     manager.securityPolicy = policy;
     
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
