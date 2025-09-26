@@ -99,41 +99,6 @@ RCT_EXPORT_METHOD(removeCookieByName: (NSString *)cookieName
         NSString *bodyString = [[NSString alloc] initWithData: responseObject encoding:NSUTF8StringEncoding];
         NSInteger statusCode = httpResp.statusCode;
         
-        // + COMMIT: Add detailed response/error logging
-        NSTimeInterval duration = ([[NSDate date] timeIntervalSince1970] * 1000.0) - startTime;
-        
-        if (error) {
-            NSLog(@"[RNSslPinning] ❌ Request failed after %.0fms with error: %@", duration, error.localizedDescription);
-            NSLog(@"[RNSslPinning] Error domain: %@, code: %ld", error.domain, (long)error.code);
-            NSLog(@"[RNSslPinning] Error userInfo: %@", error.userInfo);
-            
-            // Check for specific SSL errors
-            if ([error.domain isEqualToString:NSURLErrorDomain]) {
-                switch (error.code) {
-                    case NSURLErrorServerCertificateUntrusted:
-                        NSLog(@"[RNSslPinning] 🔒 SSL Error: Server certificate untrusted");
-                        break;
-                    case NSURLErrorServerCertificateHasBadDate:
-                        NSLog(@"[RNSslPinning] 🔒 SSL Error: Certificate has bad date");
-                        break;
-                    case NSURLErrorServerCertificateHasUnknownRoot:
-                        NSLog(@"[RNSslPinning] 🔒 SSL Error: Certificate has unknown root");
-                        break;
-                    case NSURLErrorServerCertificateNotYetValid:
-                        NSLog(@"[RNSslPinning] 🔒 SSL Error: Certificate not yet valid");
-                        break;
-                    case NSURLErrorClientCertificateRejected:
-                        NSLog(@"[RNSslPinning] 🔒 SSL Error: Client certificate rejected");
-                        break;
-                    default:
-                        NSLog(@"[RNSslPinning] 🔒 SSL Error code: %ld", (long)error.code);
-                        break;
-                }
-            }
-        } else {
-            NSLog(@"[RNSslPinning] ✅ Request completed after %.0fms with status: %ld", duration, (long)statusCode);
-        }
-        
         // Don't create a synthetic response - pass the real one to observer along with error
         if (error && (!httpResp || httpResp.statusCode == 0)) {
             bodyString = error.localizedDescription;
