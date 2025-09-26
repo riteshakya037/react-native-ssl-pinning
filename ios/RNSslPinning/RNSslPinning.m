@@ -291,6 +291,8 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     
     AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
     policy.validatesDomainName = false;
+    policy.allowInvalidCertificates = true;
+
     NSLog(@"[RNSslPinning] Final policy flags -> validatesDomainName=%@, allowInvalidCertificates=%@",
           policy.validatesDomainName ? @"YES" : @"NO",
           policy.allowInvalidCertificates ? @"YES" : @"NO");
