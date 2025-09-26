@@ -19,7 +19,8 @@ export namespace ReactNativeSSLPinning {
         },
         timeoutInterval?: number,
         disableAllSecurity?: boolean,
-        caseSensitiveHeaders?: boolean = false
+        caseSensitiveHeaders?: boolean,
+        skipHostnameVerification?: boolean
     }
 
     interface Response {

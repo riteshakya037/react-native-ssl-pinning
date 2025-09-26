@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
@@ -68,7 +70,9 @@ public class OkHttpUtils {
 
         OkHttpClient client = null;
         CertificatePinner certificatePinner = null;
-        if (!clientsByDomain.containsKey(domainName)) {
+        boolean skipHostnameVerification = options.hasKey("skipHostnameVerification") && options.getBoolean("skipHostnameVerification");
+        String cacheKey = domainName + "|skipHost=" + (skipHostnameVerification ? "1" : "0");
+        if (!clientsByDomain.containsKey(cacheKey)) {
             // add logging interceptor
             HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
             logging.setLevel(HttpLoggingInterceptor.Level.BODY);
@@ -93,13 +97,22 @@ public class OkHttpUtils {
             }
             addCustomDebugInterceptor(clientBuilder);
 
-            client = clientBuilder
-                    .build();
+            if (skipHostnameVerification) {
+                HostnameVerifier hostnameVerifier = new HostnameVerifier() {
+                    @Override
+                    public boolean verify(String hostname, SSLSession session) {
+                        return true;
+                    }
+                };
+                clientBuilder.hostnameVerifier(hostnameVerifier);
+            }
+
+            client = clientBuilder.build();
 
 
-            clientsByDomain.put(domainName, client);
+            clientsByDomain.put(cacheKey, client);
         } else {
-            client = clientsByDomain.get(domainName);
+            client = clientsByDomain.get(cacheKey);
         }
 
 

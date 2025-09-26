@@ -158,6 +158,19 @@ fetch("https://publicobject.com", {
 	})
 		
 ```
+### Skip Hostname Verification (iOS & Android)
+```javascript
+// This disables hostname verification while still performing TLS validation.
+// Useful for development with mismatched hostnames. Do NOT use in production.
+fetch("https://your.dev.endpoint", {
+  method: "GET",
+  timeoutInterval: 10000,
+  skipHostnameVerification: true, // iOS & Android
+  headers: {
+    Accept: "application/json; charset=utf-8",
+  }
+})
+```
 ### Case Sensitive Headers
 ```javascript
 
