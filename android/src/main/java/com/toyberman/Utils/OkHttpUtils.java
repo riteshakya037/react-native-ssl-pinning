@@ -92,8 +92,16 @@ public class OkHttpUtils {
                 clientBuilder.addInterceptor(logging);
             }
             addCustomDebugInterceptor(clientBuilder);
+            
+            HostnameVerifier hostnameVerifier = new HostnameVerifier() {
+                @Override
+                public boolean verify(String hostname, SSLSession session) {
+                    return true;
+                }
+            };
 
             client = clientBuilder
+                    .hostnameVerifier(hostnameVerifier)
                     .build();
 
 
