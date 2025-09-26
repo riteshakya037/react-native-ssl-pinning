@@ -267,41 +267,21 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     BOOL skipHostnameVerification = [[obj objectForKey:@"skipHostnameVerification"] boolValue];
     
     NSSet *certificates = [AFSecurityPolicy certificatesInBundle:[NSBundle mainBundle]];
-    
-    // Debug logging: enumerate bundled .cer files and policy inputs
-    NSArray<NSString *> *cerPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"cer" inDirectory:nil];
-    NSLog(@"[RNSslPinning] Found %lu .cer file(s) in main bundle", (unsigned long)cerPaths.count);
-    for (NSString *path in cerPaths) {
-        NSLog(@"[RNSslPinning] .cer in bundle: %@", [path lastPathComponent]);
-    }
-    
-    NSLog(@"[RNSslPinning] certificatesInBundle count=%lu, pkPinning=%@, disableAllSecurity=%@, skipHostnameVerification=%@",
-          (unsigned long)[certificates count],
-          pkPinning ? @"YES" : @"NO",
-          disableAllSecurity ? @"YES" : @"NO",
-          skipHostnameVerification ? @"YES" : @"NO");
-    
+
     // set policy (ssl pinning)
     if(disableAllSecurity){
         policy = [AFSecurityPolicy policyWithPinningMode:AFSSLPinningModeNone];
         policy.allowInvalidCertificates = true;
-        NSLog(@"[RNSslPinning] Using pinning mode: None (all security disabled)");
     }
     else if (pkPinning){
         policy = [AFSecurityPolicy policyWithPinningMode:AFSSLPinningModePublicKey withPinnedCertificates:certificates];
-        NSLog(@"[RNSslPinning] Using pinning mode: PublicKey, pinned certs: %lu", (unsigned long)[certificates count]);
     }
     else{
         policy = [AFSecurityPolicy policyWithPinningMode:AFSSLPinningModeCertificate withPinnedCertificates:certificates];
-        NSLog(@"[RNSslPinning] Using pinning mode: Certificate, pinned certs: %lu", (unsigned long)[certificates count]);
     }
     
     AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
     policy.validatesDomainName = !skipHostnameVerification;
-
-    NSLog(@"[RNSslPinning] Final policy flags -> validatesDomainName=%@, allowInvalidCertificates=%@",
-          policy.validatesDomainName ? @"YES" : @"NO",
-          policy.allowInvalidCertificates ? @"YES" : @"NO");
     manager.securityPolicy = policy;
     
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
