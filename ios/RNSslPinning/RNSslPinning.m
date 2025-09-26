@@ -291,12 +291,27 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     
     AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
     policy.validatesDomainName = false;
-    policy.allowInvalidCertificates = true;
 
     NSLog(@"[RNSslPinning] Final policy flags -> validatesDomainName=%@, allowInvalidCertificates=%@",
           policy.validatesDomainName ? @"YES" : @"NO",
           policy.allowInvalidCertificates ? @"YES" : @"NO");
     manager.securityPolicy = policy;
+    
+    // Skip hostname validation by evaluating server trust with domain=nil while still enforcing pinning
+    [manager setSessionDidReceiveChallengeBlock:^NSURLSessionAuthChallengeDisposition(NSURLSession *session, NSURLAuthenticationChallenge *challenge, NSURLCredential *__autoreleasing *credential) {
+        if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+            SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
+            NSString *domain = nil; // Passing nil to avoid hostname validation
+            BOOL trusted = [policy evaluateServerTrust:serverTrust forDomain:domain];
+            NSLog(@"[RNSslPinning] evaluateServerTrust(forDomain:nil) => %@", trusted ? @"YES" : @"NO");
+            if (trusted) {
+                *credential = [NSURLCredential credentialForTrust:serverTrust];
+                return NSURLSessionAuthChallengeUseCredential;
+            }
+            return NSURLSessionAuthChallengeCancelAuthenticationChallenge;
+        }
+        return NSURLSessionAuthChallengePerformDefaultHandling;
+    }];
     
     manager.responseSerializer = [AFHTTPResponseSerializer serializer];
     
