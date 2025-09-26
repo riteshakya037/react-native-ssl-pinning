@@ -274,10 +274,6 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
     for (NSString *path in cerPaths) {
         NSLog(@"[RNSslPinning] .cer in bundle: %@", [path lastPathComponent]);
     }
-    // + COMMIT: Log .crt files as well
-    for (NSString *path in crtPaths) {
-        NSLog(@"[RNSslPinning] .crt in bundle: %@", [path lastPathComponent]);
-    }
     
     NSLog(@"[RNSslPinning] certificatesInBundle count=%lu, pkPinning=%@, disableAllSecurity=%@, skipHostnameVerification=%@",
           (unsigned long)[certificates count],
