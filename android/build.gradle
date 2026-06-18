@@ -1,32 +1,23 @@
 
-buildscript {
-    repositories {
-        jcenter()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:2.3.0'
-    }
-}
-
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion "28.0.3"
+    namespace "com.toyberman"
+    compileSdk 34
 
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 28
+        minSdk 16
+        targetSdk 34
         versionCode 1
         versionName "1.0"
     }
-    lintOptions {
+    lint {
         abortOnError false
     }
 }
 
 repositories {
+    google()
     mavenCentral()
 }
 
