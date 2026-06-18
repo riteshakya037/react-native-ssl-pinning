@@ -305,6 +305,17 @@ RCT_EXPORT_METHOD(fetch:(NSString *)url obj:(NSDictionary *)obj callback:(RCTRes
             
             // this is a multipart form data request
             if([body isKindOfClass:[NSDictionary class]]){
+                if ([body objectForKey:@"fileUri"]) {
+                    NSString *fileUri = body[@"fileUri"];
+                    NSURL *fileUrl = [NSURL URLWithString:fileUri];
+                    if (fileUrl == nil) {
+                        fileUrl = [NSURL fileURLWithPath:fileUri];
+                    }
+                    NSData *data = [NSData dataWithContentsOfURL:fileUrl];
+                    [request setHTTPBody:data];
+                    [self performRequest:manager obj:obj request:request callback:callback];
+                    return;
+                }
                 // post multipart
                 if ([body objectForKey:@"formData"]) {
                     [self performMultipartRequest:manager obj:obj url:url request:request callback:callback formData:body[@"formData"]];

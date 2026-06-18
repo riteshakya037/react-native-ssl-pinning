@@ -302,7 +302,11 @@ public class OkHttpUtils {
                     break;
                 case Map:
                     ReadableMap bodyMap = options.getMap(BODY_KEY);
-                    if (bodyMap.hasKey("formData")) {
+                    if (bodyMap.hasKey("fileUri")) {
+                        Uri uri = Uri.parse(bodyMap.getString("fileUri"));
+                        File file = new File(uri.getPath());
+                        body = RequestBody.create(mediaType, file);
+                    } else if (bodyMap.hasKey("formData")) {
                         ReadableMap formData = bodyMap.getMap("formData");
                         body = buildFormDataRequestBody(context, formData);
                     } else if (bodyMap.hasKey("_parts")) {
